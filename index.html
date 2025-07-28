@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Z++ Compiler DEMO</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+    <link rel="stylesheet" href="./style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <main class="container">
+        <header>
+            <hgroup>
+                <h1>Z++ Online Compiler</h1>
+                <h2>.zppファイルをアップロード</h2>
+            </hgroup>
+            <div class="grid">
+                <label for="file-upload" class="secondary outline">
+                    <input type="file" id="file-upload" name="file-upload" accept=".zpp" style="display: none;">
+                    <i data-lucide="upload"></i> .zpp を選択
+                </label>
+                <button id="compile-btn" disabled>
+                    <i data-lucide="play"></i> コンパイル
+                </button>
+            </div>
+        </header>
+
+        <div id="editor-grid">
+            <article id="source-panel">
+                <header>
+                    <h5 id="source-filename">ソースコード (.zpp)</h5>
+                </header>
+                <textarea id="source-code" placeholder="ここに.zppファイルの内容が表示されます..."></textarea>
+            </article>
+            <article id="output-panel">
+                <header>
+                    <h5 id="output-filename">生成コード (.asm)</h5>
+                    <a href="#" id="download-btn" role="button" class="contrast outline" style="display: none;">
+                        <i data-lucide="download"></i> ダウンロード
+                    </a>
+                </header>
+                <textarea id="output-code" readonly placeholder="ここにコンパイル結果が表示されます..."></textarea>
+            </article>
+        </div>
+
+        <article id="console-panel">
+            <header><h5>コンソール</h5></header>
+            <pre><code id="console-output"></code></pre>
+        </article>
+
+    </main>
+
+    <script type="module" src="./main.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
