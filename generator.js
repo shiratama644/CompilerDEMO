@@ -102,16 +102,20 @@ export function generator(ast, symTable) {
     // 4. _start section
     codeBuilder.emit('_start:');
     // Global variable initializations
-    const globals = [...symbolTable.values()].filter(s => s.kind === 'variable' && s.node.initializer);
+    const globals = [...symbolTable.values()].filter(s => s.kind === 'variable');
     if (globals.length > 0) {
-        codeBuilder.emit('    ; --- Global Variable Initialization ---');
-        globals.forEach(g => {
-            const initValue = g.node.initializer.value;
-            codeBuilder.emit(`    LDI r1, ${initValue}`);
-            codeBuilder.emit(`    API ap1, ${g.address}`);
-            codeBuilder.emit(`    MST r1, ap1, 0`);
-        });
+      codeBuilder.emit('    ; --- Global Variable Initialization ---');
+      globals.forEach(g => {
+          // 初期化子があるかチェック
+          const initValue = g.node.initializer ? g.node.initializer.value : 0;
+          
+          codeBuilder.emit(`    ; Initialize ${g.name} to ${initValue}`);
+          codeBuilder.emit(`    LDI r1, ${initValue}`);
+          codeBuilder.emit(`    API ap1, ${g.address}`);
+          codeBuilder.emit(`    MST r1, ap1, 0`);
+      });
     }
+
     codeBuilder.emit('    ; --- Main Execution ---');
     codeBuilder.emit('    CAL main');
     codeBuilder.emit('    HLT');
