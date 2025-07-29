@@ -17,24 +17,27 @@ function expectToken(type) {
 }
 
 function createNode(type, props) {
-    const token = currentToken();
-    return { type, line: token.line, column: token.column, ...props };
+    // createNode should use the start token's position, so we get it before consuming
+    const startToken = currentToken();
+    return { type, line: startToken.line, column: startToken.column, ...props };
 }
 
 function parseExpression() {
     let node;
-    if (currentToken().type === 'INTEGER') {
+    const startToken = currentToken();
+    if (startToken.type === 'INTEGER') {
         node = createNode('Literal', { value: parseInt(consumeToken().value, 10) });
-    } else if (currentToken().type === 'IDENTIFIER') {
+    } else if (startToken.type === 'IDENTIFIER') {
         node = createNode('Identifier', { name: consumeToken().value });
     } else {
-        throw new Error(`Parser Error: Unexpected token in expression: ${currentToken().value}`);
+        throw new Error(`Parser Error: Unexpected token in expression: ${startToken.value}`);
     }
 
     if (currentToken().type === 'OPERATOR') {
         const op = consumeToken().value;
         const right = parseExpression();
-        node = createNode('BinaryOperation', { operator: op, left: node, right: right });
+        // The node for BinaryOperation should be created with its own position info
+        node = { type: 'BinaryOperation', line: op.line, column: op.column, operator: op, left: node, right: right };
     }
     return node;
 }
@@ -42,69 +45,100 @@ function parseExpression() {
 function parseStatement() {
     const token = currentToken();
     if (token.type === 'KEYWORD' && token.value === 'return') {
+        const node = createNode('ReturnStatement', {});
         consumeToken(); // 'return'
         let argument = null;
         if (currentToken().type !== 'SEMICOLON') {
             argument = parseExpression();
         }
         expectToken('SEMICOLON');
-        return createNode('ReturnStatement', { argument });
+        node.argument = argument;
+        return node;
     }
     if (token.type === 'IDENTIFIER' && peekToken().type === 'L_PAREN') {
-        const name = consumeToken().value;
+        const node = createNode('FunctionCall', { name: consumeToken().value });
         expectToken('L_PAREN');
         expectToken('R_PAREN');
         expectToken('SEMICOLON');
-        return createNode('FunctionCall', { name });
+        return node;
     }
     if (token.type === 'IDENTIFIER' && peekToken().type === 'ASSIGN') {
-        const left = createNode('Identifier', { name: consumeToken().value });
+        const node = createNode('AssignmentStatement', {});
+        node.left = createNode('Identifier', { name: consumeToken().value });
         expectToken('ASSIGN');
-        const right = parseExpression();
+        node.right = parseExpression();
         expectToken('SEMICOLON');
-        return createNode('AssignmentStatement', { left, right });
+        return node;
+    }
+    if (token.type === 'RUN_ASM') {
+        const node = createNode('RunAsmStatement', {});
+        consumeToken(); // 'Run.Asm'
+        expectToken('L_PAREN');
+        node.code = expectToken('STRING').value.slice(1, -1); // Remove quotes
+        expectToken('R_PAREN');
+        expectToken('SEMICOLON');
+        return node;
+    }
+    if (token.type === 'RUN_ASM_BLOCK') {
+        const node = createNode('RunAsmBlockStatement', {});
+        consumeToken(); // 'Run.AsmBlock'
+        const rawAsmCode = expectToken('STRING').value;
+
+        // --- NEW: Strip comments from the block content ---
+        const cleanedAsmCode = rawAsmCode
+            .replace(/\/\*[\s\S]*?\*\//g, '') // Remove multi-line comments first
+            .replace(/\/\/.*/g, '');          // Remove single-line comments
+
+        node.code = cleanedAsmCode;
+        return node;
     }
     throw new Error(`Parser Error: Unexpected token '${token.value}' at line ${token.line}`);
 }
 
 function parseBlockStatement() {
+    const node = createNode('BlockStatement', {});
     expectToken('L_BRACE');
     const body = [];
     while (currentToken().type !== 'R_BRACE' && currentToken().type !== 'EOF') {
         body.push(parseStatement());
     }
     expectToken('R_BRACE');
-    return createNode('BlockStatement', { body });
+    node.body = body;
+    return node;
 }
 
 function parseTopLevelDeclaration() {
     const startToken = currentToken();
     if (startToken.type === 'KEYWORD' && startToken.value === 'const') {
+        const node = createNode('ConstantDeclaration', {});
         consumeToken(); // 'const'
         expectToken('KEYWORD'); // 'int'
-        const name = expectToken('IDENTIFIER').value;
+        node.name = expectToken('IDENTIFIER').value;
         expectToken('ASSIGN');
-        const value = parseExpression();
+        node.value = parseExpression();
         expectToken('SEMICOLON');
-        return createNode('ConstantDeclaration', { name, value });
+        return node;
     }
 
     const type = consumeToken().value; // 'int' or 'void'
     const name = expectToken('IDENTIFIER').value;
 
     if (currentToken().type === 'L_PAREN') { // Function Declaration
+        const node = createNode('FunctionDeclaration', { returnType: type, name });
         expectToken('L_PAREN');
         expectToken('R_PAREN');
-        const body = parseBlockStatement();
-        return createNode('FunctionDeclaration', { returnType: type, name, body });
+        node.body = parseBlockStatement();
+        return node;
     } else { // Variable Declaration
+        const node = createNode('VariableDeclaration', { dataType: type, name });
         let initializer = null;
         if (currentToken().type === 'ASSIGN') {
             consumeToken();
             initializer = parseExpression();
         }
         expectToken('SEMICOLON');
-        return createNode('VariableDeclaration', { dataType: type, name, initializer });
+        node.initializer = initializer;
+        return node;
     }
 }
 

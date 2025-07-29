@@ -12,9 +12,16 @@ class SemanticError extends Error {
 /** @type {SymbolTable} */
 let symbolTable;
 let globalMemoryOffset = 0;
+let hasUsedRunSyntax = false; // --- NEW ---
 
 function visit(node) {
     switch (node.type) {
+        // --- NEW ---
+        case 'RunAsmStatement':
+        case 'RunAsmBlockStatement':
+            hasUsedRunSyntax = true;
+            break;
+        // --- END NEW ---
         case 'AssignmentStatement': {
             const symbol = symbolTable.get(node.left.name);
             if (!symbol) throw new SemanticError(`Variable '${node.left.name}' is not declared`, node.left);
@@ -51,11 +58,12 @@ function visit(node) {
 
 /**
  * @param {AstNode} ast
- * @returns {[AstNode, SymbolTable]}
+ * @returns {[AstNode, SymbolTable, boolean]}
  */
 export function analyzer(ast) {
     symbolTable = new Map();
     globalMemoryOffset = 0;
+    hasUsedRunSyntax = false; // Reset flag
 
     // 1st Pass: Collect all top-level declarations
     for (const node of ast.body) {
@@ -83,5 +91,5 @@ export function analyzer(ast) {
         }
     }
 
-    return [ast, symbolTable];
+    return [ast, symbolTable, hasUsedRunSyntax];
 }

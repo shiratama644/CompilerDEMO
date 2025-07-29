@@ -1,5 +1,7 @@
 /**
- * @typedef {'KEYWORD' | 'IDENTIFIER' | 'INTEGER' | 'OPERATOR' | 'ASSIGN' | 'L_PAREN' | 'R_PAREN' | 'L_BRACE' | 'R_BRACE' | 'SEMICOLON' | 'EOF'} TokenType
+ * @typedef {'KEYWORD' | 'IDENTIFIER' | 'INTEGER' | 'OPERATOR' | 'ASSIGN' | 
+ *           'L_PAREN' | 'R_PAREN' | 'L_BRACE' | 'R_BRACE' | 'SEMICOLON' | 
+ *           'STRING' | 'RUN_ASM' | 'RUN_ASM_BLOCK' | 'EOF'} TokenType
  */
 
 /**
@@ -9,6 +11,7 @@
 /**
  * @typedef {'Program' | 'FunctionDeclaration' | 'VariableDeclaration' | 'ConstantDeclaration' | 
  *           'BlockStatement' | 'ReturnStatement' | 'AssignmentStatement' | 'FunctionCall' | 
+ *           'RunAsmStatement' | 'RunAsmBlockStatement' |
  *           'BinaryOperation' | 'Identifier' | 'Literal'} AstNodeType
  */
 

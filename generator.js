@@ -7,6 +7,7 @@ let symbolTable;
 class CodeBuilder {
     constructor() { this.code = []; }
     emit(line) { this.code.push(line); }
+    emitRaw(rawCode) { this.code.push(rawCode); } // --- NEW ---
     emitLabel(label) { this.code.push(`${label}:`); }
     getCode() { return this.code.join('\n'); }
 }
@@ -52,6 +53,16 @@ function visit(node) {
         case 'BlockStatement':
             node.body.forEach(visit);
             break;
+        // --- NEW ---
+        case 'RunAsmStatement':
+            codeBuilder.emitRaw(`    ; Run.Asm`);
+            codeBuilder.emitRaw(`    ${node.code}`);
+            break;
+        case 'RunAsmBlockStatement':
+            codeBuilder.emitRaw(`    ; Run.AsmBlock`);
+            codeBuilder.emitRaw(node.code);
+            break;
+        // --- END NEW ---
         case 'AssignmentStatement': {
             const symbol = symbolTable.get(node.left.name);
             const valueReg = evaluateExpression(node.right);
@@ -106,9 +117,7 @@ export function generator(ast, symTable) {
     if (globals.length > 0) {
       codeBuilder.emit('    ; --- Global Variable Initialization ---');
       globals.forEach(g => {
-          // 初期化子があるかチェック
           const initValue = g.node.initializer ? g.node.initializer.value : 0;
-          
           codeBuilder.emit(`    ; Initialize ${g.name} to ${initValue}`);
           codeBuilder.emit(`    LDI r1, ${initValue}`);
           codeBuilder.emit(`    API ap1, ${g.address}`);
