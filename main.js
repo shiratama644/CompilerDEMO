@@ -21,25 +21,6 @@ let compiledCode = '';
 
 // --- サンプルコード ---
 const sampleCode = `// Welcome to Z++ Online Compiler!
-// ▶ボタンを押してコンパイルを試してください。
-
-const int MAX_VALUE = 255;
-int counter = 0;
-
-void increment_counter() {
-    counter = counter + 1;
-}
-
-int main() {
-    increment_counter();
-    increment_counter();
-    
-    if (counter == 2) {
-        return MAX_VALUE;
-    }
-
-    return 0;
-}
 `;
 
 // --- UI制御とロジック ---
