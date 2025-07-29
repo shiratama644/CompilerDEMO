@@ -16,41 +16,40 @@ const sourceFilenameEl = document.getElementById('source-filename');
 const outputFilenameEl = document.getElementById('output-filename');
 
 // --- 状態変数 ---
-let currentFileName = 'untitled.zpp'; // デフォルトのファイル名
+let currentFileName = 'untitled.zpp';
 let compiledCode = '';
 
 // --- サンプルコード ---
 const sampleCode = `// Welcome to Z++ Online Compiler!
-// You can use Run.Asm for inline assembly.
+// You can edit this code and click Compile.
 
 const int MY_VALUE = 123;
+int result = 0;
+
+void calculate() {
+    result = MY_VALUE * 2; // 123 * 2 = 246
+}
 
 int main() {
-    Run.Asm("LDI r1, MY_VALUE");
-    Run.AsmBlock {
-        ; This is a block of assembly
-        ; It will be inserted as is.
-        ADD r1, r0, r15
-    }
-    return;
+    calculate();
+    Run.Asm("NOP"); // Insert a No-Operation
+    return result + 5; // 246 + 5 = 251
 }
 `;
 
 // --- UI制御とロジック ---
 
-/**
- * コンソールにメッセージとタイプに応じたスタイルでログを出力する
- * @param {string} message - 表示するメッセージ
- * @param {'info' | 'success' | 'error' | 'warning'} type - メッセージの種類
- */
 function logToConsole(message, type = 'info') {
-    consoleOutputEl.innerHTML = message; // Use innerHTML to render line breaks
+    consoleOutputEl.innerHTML = message;
     consoleOutputEl.className = `console-${type}`;
 }
 
-/**
- * メインのコンパイル処理
- */
+// --- NEW: Function to update compile button state ---
+function updateCompileButtonState() {
+    const hasContent = sourceCodeEl.value.trim().length > 0;
+    compileBtn.disabled = !hasContent;
+}
+
 function compile() {
     const sourceCode = sourceCodeEl.value;
     if (!sourceCode.trim()) {
@@ -66,7 +65,6 @@ function compile() {
         try {
             const tokens = lexer(sourceCode);
             const ast = parser(tokens);
-            // --- UPDATED ---
             const [analyzedAst, symbolTable, hasUsedRun] = analyzer(ast);
             const assemblyCode = generator(analyzedAst, symbolTable);
             
@@ -78,7 +76,6 @@ function compile() {
                 successMessage += '<br><b>警告:</b> Run.Asm/Run.AsmBlockが使用されました。アセンブリコードの内容は検証されていません。';
             }
             logToConsole(successMessage, 'success');
-            // --- END UPDATED ---
             
             const outputFileName = currentFileName.replace(/\.zpp$/, '.asm') || 'compiled.asm';
             outputFilenameEl.textContent = `生成コード (${outputFileName})`;
@@ -91,10 +88,6 @@ function compile() {
     }, 10);
 }
 
-/**
- * ファイルアップロード時の処理
- * @param {Event} event 
- */
 function handleFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -111,30 +104,31 @@ function handleFileUpload(event) {
         sourceCodeEl.value = e.target.result;
         sourceFilenameEl.textContent = `ソースコード (${currentFileName})`;
         logToConsole(`ファイル '${currentFileName}' の読み込みが完了しました。`, 'info');
+        updateCompileButtonState(); // --- ADDED: Update button state after file load ---
     };
     reader.readAsText(file);
 }
 
-/**
- * ダウンロードボタンの処理
- */
 function handleDownload() {
     const blob = new Blob([compiledCode], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     downloadBtn.href = url;
 }
 
-/**
- * 初期化処理
- */
 function initialize() {
+    // イベントリスナーを設定
     compileBtn.addEventListener('click', compile);
     fileUpload.addEventListener('change', handleFileUpload);
     downloadBtn.addEventListener('click', handleDownload);
+    // --- NEW: Add event listener for textarea input ---
+    sourceCodeEl.addEventListener('input', updateCompileButtonState);
 
+    // エディタにサンプルコードをセット
     sourceCodeEl.value = sampleCode;
     sourceFilenameEl.textContent = `ソースコード (${currentFileName})`;
-    compileBtn.disabled = false;
+
+    // --- UPDATED: Set initial button state ---
+    updateCompileButtonState();
 
     logToConsole('準備完了。コードを編集またはファイルをアップロードしてコンパイルしてください。', 'info');
 }
