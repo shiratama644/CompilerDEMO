@@ -1,7 +1,0 @@
-void test(){
-  return;
-}
-int main(){
-  test();
-  retutn 4-2;
-}
