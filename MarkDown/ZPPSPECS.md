@@ -661,68 +661,88 @@ namespace MyModule {
 *   **書式:** `#include "ファイルパス"`
 *   **動作:** コンパイラは、この行を指定されたファイルの内容全体で置き換えます。
 
-#### 9.3. 名前空間 (`namespace`) による論理的なグループ化
-`namespace`は、プログラム内の識別子（関数、クラス、変数など）が所属する「空間」や「領域」を定義します。これにより、異なる名前空間にさえあれば、同じ名前の識別子が共存できます。
+#### 9.3. 名前空間 (`namespace`)
+`namespace`は、プログラム内の識別子が所属する「空間」を定義し、名前の衝突を防ぎます。
 
-*   **定義:** `namespace 名前 { ... }` のブロックで、シンボルをグループ化します。
-    ```zpp
-    // my_utils.zpp
-    namespace Math {
-        int add(int a, int b) { return a + b; }
-    }
-    namespace String {
-        // ...
-    }
-    ```
-
-#### 9.4. 名前空間内のシンボルへのアクセス
-`#include`したファイル内の、`namespace`に属するシンボルを利用するには、以下のいずれかの方法を使います。
-
-##### 9.4.1. スコープ解決演算子 (`::`)
-`名前空間::シンボル名` の形式で、どの名前空間に属するシンボルかを明示的に指定します。これは最も安全で明確な方法です。
-
+##### 9.3.1. 名前空間の定義
+`namespace 名前 { ... }` のブロックで、関数、クラス、変数などのシンボルをグループ化します。
 ```zpp
-#include "my_utils.zpp"
-
-int main() {
-    // 'Math'名前空間の'add'関数を、フルネームで呼び出す
-    int result = Math::add(10, 20);
-    return result;
+// my_utils.zpp
+namespace Math {
+    int add(int a, int b) { return a + b; }
+}
+namespace IO {
+    void print(int val);
 }
 ```
 
-##### 9.4.2. `using namespace` 宣言によるインポート
-毎回`Namespace::`と書く手間を省くために、特定の名前空間のシンボルを現在のスコープに「持ち込む」ことができます。
+##### 9.3.2. グローバル名前空間
+`namespace`ブロックの外側で定義されたシンボルは、**グローバル名前空間**に所属します。これは、全ての名前空間の親となる、暗黙的な空間です。
 
-*   **特定のシンボルのみをインポート:**
-    `using namespace 名前空間::シンボル名;`
+##### 9.3.3. 無名名前空間によるアクセス制御
+`namespace { ... }` のように名前を指定せずに定義された名前空間（無名名前空間）の中のシンボルは、**そのファイルの外側からは完全にアクセス不可能**になります。これは、モジュール内部でのみ使用する非公開なヘルパー関数や変数を定義するための、強力な情報隠蔽の仕組みです。
+
+#### 9.4. シンボルのインポートとアクセス
+`#include`したファイル内のシンボルを利用するには、以下の3つの方法があります。
+
+##### 9.4.1. スコープ解決演算子 (`::`)
+`名前空間::シンボル名` の形式で、どの名前空間に属するシンボルかを明示的に指定します。これは最も安全で明確な方法です。グローバル名前空間のシンボルを明示的に指定する場合は `::シンボル名` のように記述します。
+
+```zpp
+#include "my_math.zpp" // Math::add が定義されている
+
+int result = Math::add(10, 20); // Math名前空間のaddを呼び出す
+```
+
+##### 9.4.2. `using`宣言 (特定シンボルのインポート)
+特定のシンボルだけを現在のスコープに持ち込み、接頭辞なしで使えるようにします。安全性と利便性のバランスが取れた、**推奨されるインポート方法**です。
+
+*   **書式:**
+    *   `using 名前空間::シンボル名;`
+    *   `using シンボル名;` **(グローバル名前空間からのインポート)**
+*   **使用例:**
     ```zpp
-    #include "my_utils.zpp"
-    using namespace Math::add; // Math名前空間のaddだけを使えるようにする
+    #include "my_math.zpp"
+    #include "global_utils.zpp" // ::global_func が定義されている
 
-    int main() {
-        int result = add(5, 3); // 'Math::'が不要になる
-        return result;
-    }
+    using Math::add;        // Math名前空間のaddだけをインポート
+    using global_func;      // グローバル名前空間のglobal_funcをインポート
+
+    int result = add(5, 3); // OK: Math::addのこと
+    global_func();          // OK: ::global_funcのこと
     ```
-*   **名前空間の全シンボルをインポート:**
-    `using namespace 名前空間;`
+
+##### 9.4.3. `using namespace`宣言 (名前空間全体のインポート)
+指定した名前空間に含まれる**全てのシンボル**を、現在のスコープに持ち込みます。便利ですが、意図しない名前の衝突を引き起こす可能性があるため、注意して使用する必要があります。
+
+*   **書式:** `using namespace 名前空間;`
+*   **使用例:**
     ```zpp
-    #include "my_utils.zpp"
+    #include "my_math.zpp"
     using namespace Math; // Math名前空間の全てを使えるようにする
 
-    int main() {
-        int result = add(5, 3);
-        return result;
-    }
+    int result = add(5, 3); // OK
     ```
 
-#### 9.5. モジュール内のアクセス制御：無名名前空間
-Z++では、`public`/`private`キーワードは`class`/`struct`のメンバに対してのみ使用します。ファイルスコープでのグローバルなシンボルの可視性を制御するには、**無名名前空間 (Anonymous Namespace)** を使用します。
+#### 9.5. 名前の衝突と曖昧さの解決
+異なる名前空間から同じ名前のシンボルを`using`でインポートした場合、その名前をそのまま使おうとすると、どちらを指すか不明確なため**コンパイルエラー**となります。
 
-*   **目的:** モジュール内部でのみ使用する、外部に公開したくないヘルパー関数やグローバル変数を定義するために使います。
-*   **構文:** `namespace { ... }` のように、名前を指定せずに名前空間を定義します。
-*   **動作:** 無名名前空間の中で定義されたシンボルは、**そのファイルの外側からは完全にアクセス不可能**になります。これは、C言語の`static`グローバル変数/関数と似た、強力な情報隠蔽の仕組みです。
+*   **曖昧な呼び出し（エラーになる例）:**
+    ```zpp
+    // file_a.zpp に ::calculate が、file_b.zpp に Math::calculate があるとする
+    #include "file_a.zpp"
+    #include "file_b.zpp"
+    using calculate;
+    using Math::calculate;
+
+    int result = calculate(10); // エラー！ ::calculate なのか Math::calculate なのか曖昧
+    ```
+*   **曖昧さの解決:**
+    このエラーを解決するには、プログラマがスコープ解決演算子`::`を使い、どちらのバージョンを呼び出すかを明示的に指定する必要があります。
+    ```zpp
+    int result1 = ::calculate(10);   // OK: グローバル名前空間のバージョンを呼び出す
+    int result2 = Math::calculate(10); // OK: Math名前空間のバージョンを呼び出す
+    ```
 
 #### 9.6. 総合的な使用例
 
@@ -731,27 +751,22 @@ Z++では、`public`/`private`キーワードは`class`/`struct`のメンバに�
 #ifndef MY_LIBRARY_ZPP
 #define MY_LIBRARY_ZPP
 
-// --- 非公開な内部実装 ---
+// --- 非公開な内部実装 (このファイル内からのみアクセス可能) ---
 namespace {
-    // この変数は、my_library.zpp の中からしかアクセスできない
     int internal_state = 0;
-
-    // この関数も、my_library.zpp の中からしか呼び出せない
-    void update_state() {
-        internal_state++;
-    }
+    void update_state() { internal_state++; }
 }
 
 // --- 公開インターフェース ---
 namespace MyLib {
-    // この関数は、他のファイルから MyLib::run() として呼び出せる
     void run() {
-        update_state(); // 内部の非公開関数を呼び出す
+        update_state();
     }
-
-    // この定数も、MyLib::VERSION として外部から参照できる
     const int VERSION = 1;
 }
+
+// --- グローバルな便利関数 ---
+void global_utility() { /* ... */ }
 
 #endif
 ```
@@ -760,24 +775,60 @@ namespace MyLib {
 ```zpp
 #include "my_library.zpp"
 
-// MyLib名前空間の'run'関数と'VERSION'定数をインポートする
-using namespace MyLib::run;
-using namespace MyLib::VERSION;
+// MyLib名前空間から'run'関数をインポート
+using MyLib::run;
+// グローバル名前空間から'global_utility'をインポート
+using global_utility;
 
 int main() {
     // OK: 'run'はインポートされている
     run();
 
-    // OK: 'VERSION'もインポートされている
-    if (VERSION == 1) {
+    // OK: 'global_utility'もインポートされている
+    global_utility();
+
+    // OK: 'VERSION'はインポートしていないが、フルネームでアクセス可能
+    if (MyLib::VERSION == 1) {
         // ...
     }
 
     // コンパイルエラー！
-    // 'internal_state'は無名名前空間の中にあるため、
-    // このファイルからは存在すら認識できない。
+    // 'internal_state'は無名名前空間の中にあるためアクセス不可
     int state = internal_state;
 
     return 0;
 }
 ```
+
+#### 9.7. デッドコード除去とROM効率 (Dead Code Elimination and ROM Efficiency)
+
+Z++コンパイラは、最終的なプログラムのROMサイズを最小限に抑えるため、**デッドコード除去**の最適化を実装します。
+
+`#include`プリプロセッサ命令は、指定されたファイルの内容をテキストとしてその場に挿入しますが、これはコンパイルの第一段階に過ぎません。インクルードされたファイルに多数の関数やクラスが定義されていても、それらが全て最終的なプログラムに含まれるわけではありません。
+
+コンパイラは、`main`関数を起点として、プログラム中で**実際に呼び出される可能性のある全ての関数**を連鎖的に解析します（このプロセスを生存コード分析と呼びます）。
+
+最終的なアセンブリコードとして生成されるのは、この分析によって「生存している」と判断された関数と、それらから参照されるグローバル変数や定数のみです。プログラムのどこからも呼び出されることのない「死んでいる」コードは、**完全に破棄**され、ROM領域を一切消費しません。
+
+**例:**
+**`my_math.zpp`**
+```zpp
+namespace Math {
+    int add(int a, int b) { return a + b; }
+
+    // この関数は main からは呼び出されない
+    int sub(int a, int b) { return a - b; }
+}
+```
+
+**`main.zpp`**
+```zpp
+#include "my_math.zpp"
+using namespace Math;
+
+int main() {
+    // add関数のみが呼び出される
+    return add(10, 5);
+}
+```
+この場合、コンパイラは`Math::add`関数が「生存している」と判断しますが、`Math::sub`関数はどこからも呼び出されていないため「死んでいる」と判断します。その結果、**`Math::sub`関数のアセンブリコードは生成されず**、ROM効率が最適化されます。
