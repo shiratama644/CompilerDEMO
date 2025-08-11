@@ -542,46 +542,96 @@ int remainder = a % b; // remainder は 1
 *   `::` は `class MotorDriver::MotorDriver()` のように使われ、優先順位の概念とは少し異なります。
 *   コンパイラは構文解析の段階で、識別子がどのスコープに属するかを解決するために `::` を利用します。
 
-### 6章 文と制御構造 (Statements and Control Structures)
+6章 文と制御構造 (Statements and Control Structures)
+6.1. if - else if - else 文
+if 文は、プログラムの実行フローを条件に基づいて分岐させるための最も基本的な制御構造です。
+ * 動作原理:
+   * まず、if (condition) の condition（条件式）が評価されます。
+   * condition の評価結果が 0 でない場合（真とみなされる）、if ブロック内の文が実行されます。
+   * condition が 0 の場合（偽とみなされる）は、次の else if の条件式が評価されます。
+   * 全ての if と else if の条件式が偽であった場合、else ブロックが存在すれば、その中の文が実行されます。
+   * else ブロックは任意であり、存在しない場合は、どの条件も満たされなければ何も実行されずに if 文全体が終了します。
 
-#### 6.1. `if - else if - else` 文
-条件に応じて処理を分岐させます。
-```zpp
+ * 使用例:
+   // 温度に応じてファンを制御する例
 if (temperature > 100) {
-    // 危険: ファンを最大でON
+    // 危険な状態。ファンを最大でONにする
+    Output(255, FAN_PORT);
 } else if (temperature > 60) {
-    // 注意: LEDを点滅させる
+    // 注意が必要な状態。ファンを中速で回す
+    Output(128, FAN_PORT);
 } else {
-    // 正常
+    // 正常な状態。ファンを停止する
+    Output(0, FAN_PORT);
 }
-```
 
-#### 6.2. `while` ループ (`while (condition) { ... }`)
-条件式が真である間、ブロック内の処理を繰り返します。
+6.2. while ループ (while (condition) { ... })
+while ループは、指定された条件が真である間、繰り返し処理を実行する制御構造です。
+ * 動作原理:
+   * ループに入る前に、while (condition) の condition が最初に評価されます。
+   * condition が 0 でない場合（真）、ループ内のブロックが実行されます。
+   * ブロック内の処理が完了すると、再び condition が評価されます。
+   * このプロセスは condition が偽（0）になるまで繰り返されます。
+   * condition が偽になった時点で、ループは終了し、while ループの直後の文に制御が移ります。
 
-#### 6.3. `do-while` ループ (`do { ... } while (condition);`)
-ブロック内の処理を一度実行してから、条件式を評価します。
-
-#### 6.4. `for` ループ (`for (init; cond; post) { ... }`)
-初期化、条件式、後処理を指定して、繰り返し処理を記述します。
-```zpp
-// 0から9まで10回ループ
-for (int i = 0; i < 10; i++) {
-    // 処理
+ * 使用例:
+   // ポート2のボタンが押されるまで待機する
+int button_state;
+cin(2) >> button_state >> end;
+while (button_state == 0) {
+    // 1クロックサイクル待機 (NOP命令が生成される)
+    // ループ内で値を更新しなければ無限ループになる
+    cin(2) >> button_state >> end;
 }
-```
+// ボタンが押された後の処理
 
-#### 6.5. `switch` 文
-一つの変数の値に応じて、多方向に分岐します。
-*   `break` を省略すると、後続の `case` が**フォールスルー**（続けて実行）されるので注意が必要です。
-```zpp
-// 動作モードを定義するenum
-enum OperationMode {
-    STANDBY,
-    RUNNING,
-    ERROR_STATE
-};
+6.3. do-while ループ (do { ... } while (condition);)
+do-while ループは、最初に必ず一度ブロック内の処理を実行してから、条件式を評価する制御構造です。
+ * 動作原理:
+   * do ブロック内の文が、条件をチェックする前に最低でも一度は実行されます。
+   * ブロックの実行が完了した後、while (condition) の condition が評価されます。
+   * condition が真（0 でない）であれば、再び do ブロックの先頭に戻り、処理が繰り返されます。
+   * condition が偽（0）になった時点で、ループは終了します。
 
+ * 使用例:
+   // センサーの初期化処理
+int sensor_status;
+do {
+    // センサーからステータスを読み込む
+    cin(SENSOR_PORT) >> sensor_status >> end;
+    // status が 1 になるまで繰り返す
+} while (sensor_status != 1);
+
+6.4. for ループ (for (init; cond; post) { ... })
+for ループは、カウンタ変数を使った繰り返し処理を簡潔に記述するための制御構造です。
+ * 書式: for (初期化式; 条件式; 後処理式) { ... }
+ * 動作原理:
+   * 初期化式 (init): ループが開始される前に一度だけ実行されます。通常はカウンタ変数の初期値を設定します。
+   * 条件式 (cond): ループ内のブロックが実行される前に毎回評価されます。この式が偽（0）になるとループは終了します。
+   * 後処理式 (post): ループ内のブロックが実行された後、毎回実行されます。通常はカウンタ変数の増減を行います。
+
+ * 使用例:
+   // ポート1のLEDを0から255まで徐々に明るくする
+for (int brightness = 0; brightness <= 255; brightness++) {
+    Output(brightness, 1);
+}
+
+6.5. switch 文
+switch 文は、一つの変数の値に応じて、複数の分岐先から一つを選択する多方向分岐の制御構造です。
+ * 動作原理:
+   * switch (expression) の expression（式）が評価されます。
+   * case constant: に続く constant（定数）と expression の値が比較されます。
+   * 一致する case ラベルが見つかると、その case から処理が開始されます。
+   * break 文が実行されるまで、後続の case や default のブロックの処理が連続して（フォールスルー）実行されます。
+   * break 文は、switch 文全体を終了させます。
+   * どの case にも一致しない場合、default ラベルが存在すればそのブロックが実行されます。
+ * アセンブリレベルの動作:
+   * コンパイラは、switch 文を効率的に実装するために、ジャンプテーブルと呼ばれるデータ構造を利用する場合があります。これは、expression の値に応じて、対応する case のアドレスを格納した配列です。
+   * ジャンプテーブルを使う場合、expression の値を使って配列からアドレスを読み出し、JMP 命令でそのアドレスへ直接ジャンプすることで、複数の CMP / BRH 命令を繰り返すよりも高速な分岐を実現します。
+   * break 文は、switch 文の終了点への JMP 命令に変換されます。
+ * 使用例:
+   // 動作モードを定義するenum
+enum OperationMode { STANDBY, RUNNING, ERROR_STATE };
 enum OperationMode current_mode = STANDBY;
 
 // ... モードを変更する何らかの処理 ...
@@ -589,22 +639,58 @@ enum OperationMode current_mode = STANDBY;
 switch (current_mode) {
     case OperationMode::STANDBY:
         // スタンバイモードの処理
-        break;
+        // ...
+        break; // switch文を抜ける
     case OperationMode::RUNNING:
         // 実行モードの処理
+        // ...
         break;
     case OperationMode::ERROR_STATE:
     default:
         // エラーまたはどのcaseにも一致しない場合の処理
+        // ...
         break;
 }
-```
 
-#### 6.6. `break` 文 (`break;`)
-現在のループ (`while`, `do-while`, `for`) や `switch` 文を強制的に抜けます。
+6.6. break 文 (break;)
+break 文は、最も近い外側の while, do-while, for ループ、または switch 文を強制的に終了させ、その直後の文に制御を移すための命令です。
+ * 動作原理:
+   * break が実行されると、ループや switch の継続条件を無視して、直ちにその制御構造の終了点へジャンプします。
 
-#### 6.7. `return` 文 (`return;` または `return expression;`)
-現在の関数を終了し、呼び出し元に制御を戻します。`expression` が指定された場合、その評価結果が関数の戻り値となります。`int` を返す関数では `int` 型の値を返す必要があります。
+ * 使用例:
+   int input_value;
+while (1) { // 無限ループ
+    cin(0) >> input_value >> end;
+    if (input_value == 100) {
+        // 値が100になったらループを抜ける
+        break;
+    }
+}
+// ループ終了後の処理
+
+6.7. return 文 (return; または return expression;)
+return 文は、現在の関数の実行を終了し、呼び出し元に制御を戻すための命令です。
+ * 動作原理:
+   * return; は、void 型の戻り値を持つ関数で使用され、単に関数を終了させます。
+   * return expression; は、int 型などの戻り値を持つ関数で使用され、expression を評価した結果を戻り値として返してから関数を終了させます。
+ * アセンブリレベルの動作:
+   * return expression; の場合、コンパイラは expression の評価結果を、呼び出し規約で定められた戻り値レジスタ r15 に格納する命令を生成します。
+   * return 文の本体は、サブルーチン呼び出し元の命令に戻るための RET 命令に変換されます。
+   * Z++の呼び出し規約では、r5 から r14 までのレジスタを関数内で変更した場合、RET 命令の前にそれらを元の値に復元する命令 (POP など) が必要となります。
+ * 使用例:
+   // 2つのintを加算して返す関数
+int add(int a, int b) {
+    // a + b の結果を r15 レジスタに格納し、RET 命令で関数を終了する
+    return a + b;
+}
+
+// main関数から呼び出し
+int main() {
+    int result = add(10, 20);
+    return 0; // main関数も int を返すため return 0 が必要
+}
+
+
 
 ### 7章 関数 (Functions)
 
