@@ -40,7 +40,7 @@ Z++は、以下の3つの原則を重視して設計されています。
 
 #### 2.3. キーワード (Keywords)
 言語の文法上、特別な意味を持つ予約語です。識別子として使用することはできません。
-`int` , `void`, const`, `if`, `else`, `while`, `do`, `for`, `return`, `switch`, `case`, `default`, `break`, `Output`, `Input`, `Run`, `struct`, `class`, `public`, `private`, `sizeof`
+`int` `void` `const` `if` `else` `while` `do` `for` `return` `switch` `case` `default` `break` `Output` `Input` `Run` `struct` `class` `public` `private` `sizeof`
 
 #### 2.4. リテラル (Literals)
 ソースコードに直接記述される値です。
