@@ -542,8 +542,8 @@ int remainder = a % b; // remainder は 1
 *   `::` は `class MotorDriver::MotorDriver()` のように使われ、優先順位の概念とは少し異なります。
 *   コンパイラは構文解析の段階で、識別子がどのスコープに属するかを解決するために `::` を利用します。
 
-6章 文と制御構造 (Statements and Control Structures)
-6.1. if - else if - else 文
+### 6章 文と制御構造 (Statements and Control Structures)
+#### 6.1. if - else if - else 文
 if 文は、プログラムの実行フローを条件に基づいて分岐させるための最も基本的な制御構造です。
  * 動作原理:
    * まず、if (condition) の condition（条件式）が評価されます。
@@ -565,7 +565,7 @@ if (temperature > 100) {
     Output(0, FAN_PORT);
 }
 
-6.2. while ループ (while (condition) { ... })
+#### 6.2. while ループ (while (condition) { ... })
 while ループは、指定された条件が真である間、繰り返し処理を実行する制御構造です。
  * 動作原理:
    * ループに入る前に、while (condition) の condition が最初に評価されます。
@@ -585,7 +585,7 @@ while (button_state == 0) {
 }
 // ボタンが押された後の処理
 
-6.3. do-while ループ (do { ... } while (condition);)
+#### 6.3. do-while ループ (do { ... } while (condition);)
 do-while ループは、最初に必ず一度ブロック内の処理を実行してから、条件式を評価する制御構造です。
  * 動作原理:
    * do ブロック内の文が、条件をチェックする前に最低でも一度は実行されます。
@@ -602,7 +602,7 @@ do {
     // status が 1 になるまで繰り返す
 } while (sensor_status != 1);
 
-6.4. for ループ (for (init; cond; post) { ... })
+#### 6.4. for ループ (for (init; cond; post) { ... })
 for ループは、カウンタ変数を使った繰り返し処理を簡潔に記述するための制御構造です。
  * 書式: for (初期化式; 条件式; 後処理式) { ... }
  * 動作原理:
@@ -616,7 +616,7 @@ for (int brightness = 0; brightness <= 255; brightness++) {
     Output(brightness, 1);
 }
 
-6.5. switch 文
+#### 6.5. switch 文
 switch 文は、一つの変数の値に応じて、複数の分岐先から一つを選択する多方向分岐の制御構造です。
  * 動作原理:
    * switch (expression) の expression（式）が評価されます。
@@ -652,7 +652,7 @@ switch (current_mode) {
         break;
 }
 
-6.6. break 文 (break;)
+#### 6.6. break 文 (break;)
 break 文は、最も近い外側の while, do-while, for ループ、または switch 文を強制的に終了させ、その直後の文に制御を移すための命令です。
  * 動作原理:
    * break が実行されると、ループや switch の継続条件を無視して、直ちにその制御構造の終了点へジャンプします。
@@ -668,7 +668,7 @@ while (1) { // 無限ループ
 }
 // ループ終了後の処理
 
-6.7. return 文 (return; または return expression;)
+#### 6.7. return 文 (return; または return expression;)
 return 文は、現在の関数の実行を終了し、呼び出し元に制御を戻すための命令です。
  * 動作原理:
    * return; は、void 型の戻り値を持つ関数で使用され、単に関数を終了させます。
