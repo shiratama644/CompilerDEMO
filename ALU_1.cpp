@@ -26,18 +26,6 @@ ALU 実装（8bit 結果 + フラグ）
 #include <thread>   // std::this_thread::sleep_for を使うために必要
 #include <chrono>   // std::chrono::duration を使うために必要
 
-// オペコードの定義
-enum class Opcode : uint8_t {
-    ADD = 0b000,
-    ADC = 0b001,
-    SUB = 0b010,
-    SBC = 0b011,
-    NOR = 0b100,
-    AND = 0b101,
-    XOR = 0b110,
-    RSH = 0b111
-};
-
 // フラグビットのマスク定義
 namespace Flags {
     constexpr uint8_t C  = 1 << 0; // Carry
@@ -54,7 +42,7 @@ public:
     uint8_t flags;
 
     // ALUの処理遅延（秒単位）
-    const double alu_delay_seconds = 0.8;
+    inline static constexpr double alu_delay_seconds = 0.8;
 
     ALU() : result(0), flags(0) {}
 
