@@ -31,8 +31,8 @@ private:
     }
 
 public:
-    const double reg_read_delay = 0.1;   // 読み出し遅延
-    const double reg_write_delay = 0.1;  // 書き込み遅延
+    inline static constexpr double reg_read_delay = 0.1;   // 読み出し遅延
+    inline static constexpr double reg_write_delay = 0.1;  // 書き込み遅延
 
     Register() = default;
 
@@ -52,7 +52,11 @@ public:
     // 全レジスタをクリア
     void reg_clear() {
         ensure_created();
-        std::fill(regs.begin(), regs.end(), 0);
+        for (size_t i = 0; i < regs.size(); ++i) {
+            if (!(has_zero_reg && i == 0)) {
+                regs[i] = 0;
+            }
+        }
         std::cout << "Registers cleared." << std::endl;
     }
 
@@ -76,20 +80,29 @@ public:
         std::this_thread::sleep_for(std::chrono::duration<double>(reg_read_delay));
         return {regs[addr_a], regs[addr_b]};
     }
+    
+    // 読み出し（単一）
+    uint8_t reg_read(uint8_t addr) {
+        ensure_created();
+        check_address(addr);
+        std::this_thread::sleep_for(std::chrono::duration<double>(reg_read_delay));
+        return regs[addr];
+    }
 
     // レジスタ一覧を表示
     void print_all_regs() const {
         std::cout << "--- Register Dump ---" << std::endl;
         for (size_t i = 0; i < regs.size(); ++i) {
-            std::cout << "R" << i << ": " << std::setw(3) << +regs[i]
-                      << " (0x" << std::hex << std::setw(2)
-                      << std::setfill('0') << +regs[i] << std::dec << ")" << std::endl;
+            std::cout << "R" << i << ": " << std::setw(3) << std::setfill(' ') << +regs[i]
+            << " (0x" << std::hex << std::setw(2)
+            << std::setfill('0') << +regs[i] << std::dec << std::setfill(' ') << ")"
+            << std::endl;
         }
         std::cout << "---------------------" << std::endl;
     }
 };
 
-namespace CPUConfig  { // デフォルト数値の名前空間
+namespace CPUConfig { // デフォルト数値の名前空間
     constexpr uint8_t RegCount = 8; // レジスタ数
     constexpr bool UseZeroReg = true; // ゼロレジスタを使うか
 }
