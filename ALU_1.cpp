@@ -19,7 +19,6 @@ ALU 実装（8bit 結果 + フラグ）
 - A=200, B=100, opcode=0b001 (ADC) -> result=45, C=1
 - A=0b10101010, B=0b01010101, opcode=0b100 (NOR) -> result=0x00, Z=1, E=1
 */
-
 #include <cstdint>
 #include <iostream>
 #include <iomanip>

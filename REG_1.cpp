@@ -31,22 +31,27 @@ private:
     }
 
 public:
-    inline static constexpr double reg_read_delay = 0.1;   // 読み出し遅延
-    inline static constexpr double reg_write_delay = 0.1;  // 書き込み遅延
+    double read_delay;   // 読み出し遅延
+    double write_delay;  // 書き込み遅延
 
     Register() = default;
 
     // レジスタ生成（一度のみ呼び出せる）
-    void reg_create(uint8_t count, bool use_zero_register) {
+    void reg_create(uint8_t count, bool use_zero_register, double new_read_delay, double new_write_delay) {
         if (is_created) {
             std::cerr << "Error: reg_create() already called. Terminate." << std::endl;
             exit(1);
         }
         regs.assign(count, 0);
         has_zero_reg = use_zero_register;
+        this->read_delay = new_read_delay;
+        this->write_delay = new_write_delay;
         is_created = true;
         std::cout << "Registers created: " << +count
-                  << ", ZeroReg: " << (use_zero_register ? "Yes" : "No") << std::endl;
+                  << ", ZeroReg: " << (use_zero_register ? "Yes" : "No")
+                  << ", ReadDelay: " << this->read_delay << "s"
+                  << ", Write delay: " << this->write_delay << "s"
+                  << std::endl;
     }
 
     // 全レジスタをクリア
@@ -69,7 +74,7 @@ public:
         } else {
             regs[addr] = data;
         }
-        std::this_thread::sleep_for(std::chrono::duration<double>(reg_write_delay));
+        std::this_thread::sleep_for(std::chrono::duration<double>(write_delay));
     }
 
     // 読み出し（2つ同時）
@@ -77,7 +82,7 @@ public:
         ensure_created();
         check_address(addr_a);
         check_address(addr_b);
-        std::this_thread::sleep_for(std::chrono::duration<double>(reg_read_delay));
+        std::this_thread::sleep_for(std::chrono::duration<double>(read_delay));
         return {regs[addr_a], regs[addr_b]};
     }
     
@@ -85,7 +90,7 @@ public:
     uint8_t reg_read(uint8_t addr) {
         ensure_created();
         check_address(addr);
-        std::this_thread::sleep_for(std::chrono::duration<double>(reg_read_delay));
+        std::this_thread::sleep_for(std::chrono::duration<double>(read_delay));
         return regs[addr];
     }
 
@@ -105,21 +110,34 @@ public:
 namespace CPUConfig { // デフォルト数値の名前空間
     constexpr uint8_t RegCount = 8; // レジスタ数
     constexpr bool UseZeroReg = true; // ゼロレジスタを使うか
+    constexpr double RegReadDelay = 0.1;
+    constexpr double RegWriteDelay = 0.1;
 }
 
 // 動作確認
 int main() {
     Register regs;
+    Register aps;
 
-    regs.reg_create(CPUConfig::RegCount, CPUConfig::UseZeroReg); // 8個作成、R0はゼロレジスタ
+    regs.reg_create(CPUConfig::RegCount, CPUConfig::UseZeroReg, CPUConfig::RegReadDelay, RegWriteDelay); // 8個作成、R0はゼロレジスタ
+    std::cout << std::endl;
+    
+    aps.reg_create(16, CPUConfig::UseZeroReg, 0.3, 0.9);
     std::cout << std::endl;
     
     regs.reg_write(100, 1);   // R1 = 100
+    aps.reg_write(10, 1);
+    
     regs.reg_write(200, 2);   // R2 = 200
+    aps.reg_write(20, 2);
+    
     regs.reg_write(50, 0);    // R0に書き込み → 無視
+    aps.reg_write(5, 0);
+    
     std::cout << std::endl;
 
     regs.print_all_regs();
+    aps.print_all_regs();
 
     auto [v1, v2] = regs.reg_read(1, 2); // R1, R2 読み出し
     std::cout << "Read: R1=" << +v1 << ", R2=" << +v2 << std::endl << std::endl;
