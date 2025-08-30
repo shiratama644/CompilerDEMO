@@ -107,7 +107,7 @@ public:
         std::cout << "---------------------" << std::endl;
     }
     
-    // オペコードで実行（２つ同時読み出し）
+    // オペコードで実行
     std::tuple<uint8_t, uint8_t> execute(uint8_t opcode, uint8_t addr_a, uint8_t data_addr_b) {
         ensure_setup();
         check_address(addr_a);
@@ -139,8 +139,6 @@ int main() {
     regs.reg_setup(CPUConfig::RegCount, CPUConfig::UseZeroReg, CPUConfig::RegReadDelay, CPUConfig::RegWriteDelay); // 8個作成、R0はゼロレジスタ
     std::cout << std::endl;
     
-    regs.reg_clear();
-    
     regs.execute(0, 1, 100);
     
     auto[r1, r2] = regs.execute(1, 1, 2);
@@ -148,6 +146,4 @@ int main() {
     std::cout << +r1 << ", " << +r2 << std::endl;
     
     regs.print_all_regs();
-    
-
 }
