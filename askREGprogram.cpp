@@ -12,20 +12,20 @@ class Register {
 private:
     std::vector<uint8_t> regs;
     bool has_zero_reg = false;
-    bool is_created = false;
+    bool is_setup = false;
 
     // アドレス範囲チェック
     void check_address(uint8_t addr) const {
         if (addr >= regs.size()) {
-            std::cerr << "Error: Invalid address r" << +addr << ". Terminate." << std::endl;
+            std::cerr << "Erro: Invalid address r" << +addr << ". Terminate." << std::endl;
             exit(1);
         }
     }
 
     // 初期化済みチェック
-    void ensure_created() const {
-        if (!is_created) {
-            std::cerr << "Error: Registers not created. Call reg_create(). Terminate." << std::endl;
+    void ensure_setup() const {
+        if (!is_setup) {
+            std::cerr << "Error: Registers is not set up. Call reg_setup(). Terminate." << std::endl;
             exit(1);
         }
     }
@@ -37,17 +37,17 @@ public:
     Register() = default;
 
     // レジスタ生成（一度のみ呼び出せる）
-    void reg_create(uint8_t count, bool use_zero_register, double new_read_delay, double new_write_delay) {
-        if (is_created) {
-            std::cerr << "Error: reg_create() already called. Terminate." << std::endl;
+    void reg_setup(uint8_t count, bool use_zero_register, double new_read_delay, double new_write_delay) {
+        if (is_setup) {
+            std::cerr << "Error: reg_setup() already called. Terminate." << std::endl;
             exit(1);
         }
         regs.assign(count, 0);
         has_zero_reg = use_zero_register;
         this->read_delay = new_read_delay;
         this->write_delay = new_write_delay;
-        is_created = true;
-        std::cout << "Registers created: " << +count
+        is_setup = true;
+        std::cout << "Registers set up: " << +count
                   << ", ZeroReg: " << (use_zero_register ? "Yes" : "No")
                   << std::endl
                   << "ReadDelay: " << this->read_delay << "s"
@@ -57,7 +57,7 @@ public:
 
     // 全レジスタをクリア
     void reg_clear() {
-        ensure_created();
+        ensure_setup();
         for (size_t i = 0; i < regs.size(); ++i) {
             if (!(has_zero_reg && i == 0)) {
                 regs[i] = 0;
@@ -68,7 +68,7 @@ public:
 
     // 書き込み
     void reg_write(uint8_t addr, uint8_t data) {
-        ensure_created();
+        ensure_setup();
         check_address(addr);
         if (has_zero_reg && addr == 0) {
             std::cout << "Write ignored: Zero Register (r0)" << std::endl;
@@ -80,7 +80,7 @@ public:
 
     // 読み出し（2つ同時）
     std::tuple<uint8_t, uint8_t> reg_read(uint8_t addr_a, uint8_t addr_b) {
-        ensure_created();
+        ensure_setup();
         check_address(addr_a);
         check_address(addr_b);
         std::this_thread::sleep_for(std::chrono::duration<double>(read_delay));
@@ -89,7 +89,7 @@ public:
     
     // 読み出し（単一）
     uint8_t reg_read(uint8_t addr) {
-        ensure_created();
+        ensure_setup();
         check_address(addr);
         std::this_thread::sleep_for(std::chrono::duration<double>(read_delay));
         return regs[addr];
@@ -109,7 +109,7 @@ public:
     
     // オペコードで実行（２つ同時読み出し）
     std::tuple<uint8_t, uint8_t> execute(uint8_t opcode, uint8_t addr_a, uint8_t data_addr_b) {
-        ensure_created();
+        ensure_setup();
         check_address(addr_a);
         if (opcode == 0) {
             if (has_zero_reg && addr_a == 0) {
@@ -136,28 +136,18 @@ namespace CPUConfig {                      // デフォルト数値の名前空�
 int main() {
     Register regs;
 
-    regs.reg_create(CPUConfig::RegCount, CPUConfig::UseZeroReg, CPUConfig::RegReadDelay, CPUConfig::RegWriteDelay); // 8個作成、R0はゼロレジスタ
+    regs.reg_setup(CPUConfig::RegCount, CPUConfig::UseZeroReg, CPUConfig::RegReadDelay, CPUConfig::RegWriteDelay); // 8個作成、R0はゼロレジスタ
     std::cout << std::endl;
     
-    regs.reg_write(1, 100);   // r1 = 100
-    
-    regs.reg_write(2, 200);   // r2 = 200
-    
-    regs.reg_write(0, 50);    // R0に書き込み → 無視
-    
-    std::cout << std::endl;
-
-    regs.print_all_regs();
-
-    auto [v1, v2] = regs.reg_read(1, 2); // R1, R2 読み出し
-    std::cout << "Read: r1 = " << +v1 << ", r2 = " << +v2 << std::endl << std::endl;
-
-    auto [zr, r3] = regs.reg_read(0, 3); // R0, R3 読み出し
-    std::cout << "Read: r0 = " << +zr << ", r3 = " << +r3 << std::endl << std::endl;
-
     regs.reg_clear();
+    
+    regs.execute(0, 1, 100);
+    
+    auto[r1, r2] = regs.execute(1, 1, 2);
+    
+    std::cout << +r1 << ", " << +r2 << std::endl;
+    
     regs.print_all_regs();
+    
 
-    auto [c1, c2] = regs.reg_read(1, 2); // クリア後確認
-    std::cout << "After clear: r1 = " << +c1 << ", r2 = " << +c2 << std::endl;
 }
