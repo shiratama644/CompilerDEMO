@@ -11,15 +11,24 @@ ALU 実装（8bit 結果 + フラグ）
   bit4: E   (Even)
   bit5: O   (Odd)
   bit6-7: 予備
-  
-レジスタ実装
-- 機能:
-  任意の数の8bitレジスタを生成
-  ゼロレジスタ（r0）の有効/無効化
-  レジスタへの書き込み（遅延あり）
-  レジスタからの読み出し（2つ同時、または単一、遅延あり）
-  全レジスタのクリア
-  全レジスタ内容のダンプ表示
+
+Register 実装 (Read, Write):
+- 関数
+  reg_create(): レジスタを新規作成
+  reg_clear():  レジスタをすべて0にリセット
+  reg_write():  指定レジスタにデータを書き込み
+  reg_read():   指定レジスタからデータを読み出し
+
+テスト:
+- 期待出力 (ALUテスト):
+  100 + 200 = 44, Flags: C=1, NC=0, Z=0, NZ=1, E=1, O=0
+  100 + 200 + 1 = 45, Flags: C=1, NC=0, Z=0, NZ=1, E=0, O=1
+  1 - 200 = 57, Flags: C=0, NC=1, Z=0, NZ=1, E=0, O=1
+  1 - 200 - 1 = 56, Flags: C=0, NC=1, Z=0, NZ=1, E=1, O=0
+  ~(0b01110111 | 0b00001111) = 0b10000000 (128), Flags: C=0, NC=1, Z=0, NZ=1, E=1, O=0
+  0b10010010 & 0b01111011 = 0b00010010 (18), Flags: C=0, NC=1, Z=1, NZ=0, E=1, O=0
+  0b01100111 ^ 0b00110011 = 0b01010100 (84), Flags: C=0, NC=1, Z=0, NZ=1, E=1, O=0
+  (0b10101010 | 0b01010101) >> 1 = 0b01111111 (127), Flags: C=0, NC=1, Z=0, NZ=1, E=0, O=1
 */
 
 #include <chrono>
@@ -30,6 +39,16 @@ ALU 実装（8bit 結果 + フラグ）
 #include <thread>
 #include <tuple>
 #include <vector>
+
+// ANSI カラーコード
+namespace Colors {
+  constexpr const char* RESET = "\033[0m";
+  constexpr const char* GREEN = "\033[32m";
+  constexpr const char* YELLOW = "\033[33m";
+  constexpr const char* CYAN = "\033[36m";
+  constexpr const char* BOLD = "\033[1m";
+  constexpr const char* DIM = "\033[2m";
+}
 
 // CPUの設定
 namespace CPUConfig {
@@ -54,12 +73,12 @@ enum class Opcode : uint8_t {
 
 // フラグビットのマスク定義
 namespace Flags {
-constexpr uint8_t C = 1 << 0;  // Carry
-constexpr uint8_t NC = 1 << 1; // Not Carry
-constexpr uint8_t Z = 1 << 2;  // Zero
-constexpr uint8_t NZ = 1 << 3; // Not Zero
-constexpr uint8_t E = 1 << 4;  // Even
-constexpr uint8_t O = 1 << 5;  // Odd
+  constexpr uint8_t C = 1 << 0;  // Carry
+  constexpr uint8_t NC = 1 << 1; // Not Carry
+  constexpr uint8_t Z = 1 << 2;  // Zero
+  constexpr uint8_t NZ = 1 << 3; // Not Zero
+  constexpr uint8_t E = 1 << 4;  // Even
+  constexpr uint8_t O = 1 << 5;  // Odd
 }
 
 // ALUクラス
@@ -73,6 +92,12 @@ private:
       std::cerr << "Error: ALU is not set up. Call alu_setup(). Terminate."  << std::endl;
       exit(1);
     }
+  }
+  
+  void update_flags(bool carry_out) {
+    flags |= carry_out ? Flags::C : Flags::NC;
+    flags |= (result == 0) ? Flags::Z : Flags::NZ;
+    flags |= ((result & 1) == 0) ? Flags::E : Flags::O;
   }
 
 public:
@@ -96,6 +121,8 @@ public:
   }
 
   void execute(uint8_t A, uint8_t B, Opcode opcode) {
+    ensure_setup();
+  
     flags = 0;
     result = 0;
 
@@ -106,79 +133,44 @@ public:
     if (is_arith) {
       bool B_invert = (static_cast<uint8_t>(opcode) & 0b010) != 0;
       uint8_t carry_in = 0;
-      if (opcode == Opcode::ADC || opcode == Opcode::SUB) {
+  　  if (opcode == Opcode::ADC || opcode == Opcode::SUB) {
         carry_in = 1;
       }
-
       // 加減算器の動作を再現
       uint8_t B2 = B_invert ? static_cast<uint8_t>(~B) : B;
-      uint16_t tmp = static_cast<uint16_t>(A) + static_cast<uint16_t>(B2) + static_cast<uint16_t>(carry_in);
+      uint16_t tmp = static_cast<uint16_t>(A) + static_cast<uint16_t>(B2) +       static_cast<uint16_t>(carry_in);
       result = static_cast<uint8_t>(tmp & 0xFF);
       bool carry_out = (tmp & 0x100) != 0;
-
-      // Carry or Not Carry
-      if (carry_out) {
-        flags |= Flags::C;
-      } else {
-        flags |= Flags::NC;
-      }
-
-      // Zero or Not Zero
-      if (result == 0) {
-        flags |= Flags::Z;
-      } else {
-        flags |= Flags::NZ;
-      }
-
-      // Even or Odd
-      if ((result & 1) == 0) {
-        flags |= Flags::E;
-      } else {
-        flags |= Flags::O;
-      }
-
+      update_flags(carry_out); // フラグをアップデート
+      
     } else {
-      flags |= Flags::NC;
       switch (opcode) {
-      case Opcode::NOR:
-        result = static_cast<uint8_t>(~(A | B));
-        break;
+        case Opcode::NOR:
+          result = static_cast<uint8_t>(~(A | B));
+          break;
 
-      case Opcode::AND:
-        result = static_cast<uint8_t>(A & B);
-        break;
+        case Opcode::AND:
+          result = static_cast<uint8_t>(A & B);
+          break;
 
-      case Opcode::XOR:
-        result = static_cast<uint8_t>(A ^ B);
-        break;
+        case Opcode::XOR:
+          result = static_cast<uint8_t>(A ^ B);
+          break;
 
-      case Opcode::RSH:
-        result =
-            static_cast<uint8_t>((static_cast<uint16_t>(A | B) >> 1) & 0xFF);
-        break;
+        case Opcode::RSH:
+          result = static_cast<uint8_t>((static_cast<uint16_t>(A | B) >> 1) & 0xFF);
+          break;
 
-      default:
-        result = 0;
-        break;
+        default:
+          result = 0;
+          break;
       }
-
-      // Zero or Not Zero
-      if (result == 0) {
-        flags |= Flags::Z;
-      } else {
-        flags |= Flags::NZ;
-      }
-
-      // Even or Odd
-      if ((result & 1) == 0) {
-        flags |= Flags::E;
-      } else {
-        flags |= Flags::O;
-      }
+      update_flags(false); // フラグをアップデート（論理演算ではキャリーは発生しない）
     }
   }
 
   void print_flags() const {
+    ensure_setup();
     std::cout << "C: " << ((flags & Flags::C) != 0)
               << ", NC: " << ((flags & Flags::NC) != 0)
               << ", Z: " << ((flags & Flags::Z) != 0)
@@ -285,148 +277,162 @@ public:
   }
 };
 
-void run_alu_test(ALU &alu, uint8_t A, uint8_t B, Opcode opcode,    const std::string &operation_name) {
-  std::cout << "Executing " << operation_name << "..." << std::flush;
-  alu.execute(A, B, opcode);
-  std::cout << " Done.\n";
-  std::cout << "  -> result: " << +alu.result << " (0x" << std::hex
-            << std::setw(2) << std::setfill('0') << +alu.result << std::dec
-            << ")\n";
-  std::cout << "  -> flags: ";
-  alu.print_flags();
-  std::cout << "\n";
-}
+class Helper {
+public:
+  void alu_test(ALU &alu, uint8_t A, uint8_t B, Opcode opcode, const std::string &operation_name) {
+    std::cout << "Executing " << operation_name << "..." << std::flush;
+    alu.execute(A, B, opcode);
+    std::cout << " Done.\n";
+    std::cout << "  -> result: " << +alu.result << " (0x" << std::hex
+              << std::setw(2) << std::setfill('0') << +alu.result << std::dec
+              << ")\n";
+    std::cout << "  -> flags: ";
+    alu.print_flags();
+    std::cout << "\n";
+  }
 
-void run_reg_write_test(Register &reg, uint8_t addr, uint8_t data, const std::string &operation_name) {
+  void reg_write_test(Register &reg, uint8_t addr, uint8_t data, const std::string &operation_name) {
     std::cout << "Executing " << operation_name << "..." << std::flush;
     reg.reg_write(addr, data);
     std::cout << " Done.\n";
-}
+  }
 
-void run_reg_read_test(Register &reg, uint8_t addr_a, uint8_t addr_b, const std::string &operation_name) {
+  void reg_read_test(Register &reg, uint8_t addr_a, uint8_t addr_b, const std::string &operation_name) {
     std::cout << "Executing " << operation_name << "..." << std::flush;
     auto [value_a, value_b] = reg.reg_read(addr_a, addr_b);
     std::cout << " Done.\n";
     std::cout << "  -> read: r" << +addr_a << " = " << +value_a << ", "
               << "r" << +addr_b << " = " << +value_b << "\n";
-}
+  }
 
-void run_combined_test(ALU &alu, Register &reg, uint8_t addr_a, uint8_t addr_b, uint8_t result_addr, Opcode opcode, const std::string &operation_name) {
+  void combined_test(ALU &alu, Register &reg, uint8_t addr_a, uint8_t addr_b, uint8_t result_addr, Opcode opcode, const std::string &operation_name) {
     std::cout << "Executing " << operation_name << "..." << std::flush;
-    
+
     // レジスタから値を読み出し
     auto [val_a, val_b] = reg.reg_read(addr_a, addr_b);
-    
     // ALU演算を実行
     alu.execute(val_a, val_b, opcode);
-    
     // 結果をレジスタに書き込み
     reg.reg_write(result_addr, alu.result);
     
     std::cout << " Done.\n";
     std::cout << "  -> operands: r" << +addr_a << "=" << +val_a << ", r" << +addr_b << "=" << +val_b << "\n";
-    std::cout << "  -> result: " << +alu.result << " (0x" << std::hex << std::setw(2) 
+    std::cout << "  -> result: " << +alu.result << " (0x" << std::hex << std::setw(2)
               << std::setfill('0') << +alu.result << std::dec << ") -> r" << +result_addr << "\n";
     std::cout << "  -> flags: ";
     alu.print_flags();
     std::cout << "\n";
-}
+  }
+  
+  void halt(double Time_sec) {
+    std::this_thread::sleep_for(std::chrono::duration<double>(Time_sec));
+  }
+};
 
-void Halt(double time_sec) {
-  std::this_thread::sleep_for(std::chrono::duration<double>(time_sec));
-}
-
-void ALU_TESTS() {
+void ALU_TESTS(Helper &run) {
+  std::cout << Colors::CYAN << Colors::BOLD << "\n==== ALU TESTS ====" << Colors::RESET << std::endl;
   ALU alu;
   alu.alu_setup(CPUConfig::ALUDelay);
   std::cout << std::endl;
-  /*
-  100 + 200 = 44, Flags: C=1, NC=0, Z=0, NZ=1, E=1, O=0
-  100 + 200 + 1 = 45, Flags: C=1, NC=0, Z=0, NZ=1, E=0, O=1
-  1 - 200 = 57, Flags: C=0, NC=1, Z=0, NZ=1, E=0, O=1
-  1 - 200 - 1 = 56, Flags: C=0, NC=1, Z=0, NZ=1, E=1, O=0
-  
-  ~(0b01110111 | 0b00001111) = 0b10000000 (128), Flags: C=0, NC=1, Z=0, NZ=1, E=1, O=0
-  0b10010010 & 0b01111011 = 0b00010010 (18), Flags: C=0, NC=1, Z=1, NZ=0, E=1, O=0
-  0b01100111 ^ 0b00110011 = 0b01010100 (84), Flags: C=0, NC=1, Z=0, NZ=1, E=1, O=0
-  (0b10101010 | 0b01010101) >> 1 = 0b01111111 (127), Flags: C=0, NC=1, Z=0, NZ=1, E=0, O=1
-  */
-  
-  // 算術演算テスト
-  run_alu_test(alu, 100, 200, Opcode::ADD, "ADD (100 + 200)");
-  run_alu_test(alu, 100, 200, Opcode::ADC, "ADC (100 + 200 + 1)");
-  run_alu_test(alu, 1, 200, Opcode::SUB, "SUB (1 - 200)");
-  run_alu_test(alu, 1, 200, Opcode::SBC, "SBC (1 - 200 - 1)");
-  // 論理演算テスト
-  run_alu_test(alu, 0b01110111, 0b00001111, Opcode::NOR, "NOR (~(0b01110111 | 0b00001111))");
-  run_alu_test(alu, 0b10010010, 0b01111011, Opcode::AND, "AND (0b10010010 & 0b01001001)");
-  run_alu_test(alu, 0b01100111, 0b00110011, Opcode::XOR, "XOR (0b01100111 ^ 0b00110011)");
-  run_alu_test(alu, 0b10101010, 0b01010101, Opcode::RSH, "RSH ((0b10101010 | 0b01010101) >> 1)");
-  std::cout << "ALU tests completed." << std::endl;
+
+  std::cout << Colors::YELLOW << "--- Arithmetic Operations ---" << Colors::RESET << std::endl;
+  run.alu_test(alu, 100, 200, Opcode::ADD, "ADD (100 + 200)");
+  run.alu_test(alu, 100, 200, Opcode::ADC, "ADC (100 + 200 + 1)");
+  run.alu_test(alu, 1, 200, Opcode::SUB, "SUB (1 - 200)");
+  run.alu_test(alu, 1, 200, Opcode::SBC, "SBC (1 - 200 - 1)");
+
+  std::cout << std::endl << Colors::YELLOW << "--- Logic Operations ---" << Colors::RESET << std::endl;
+  run.alu_test(alu, 0b01110111, 0b00001111, Opcode::NOR, "NOR (~(0b01110111 | 0b00001111))");
+  run.alu_test(alu, 0b10010010, 0b01111011, Opcode::AND, "AND (0b10010010 & 0b01111011)");
+  run.alu_test(alu, 0b01100111, 0b00110011, Opcode::XOR, "XOR (0b01100111 ^ 0b00110011)");
+  run.alu_test(alu, 0b10101010, 0b01010101, Opcode::RSH, "RSH ((0b10101010 | 0b01010101) >> 1)");
+
+  std::cout << std::endl << Colors::GREEN << Colors::BOLD << "✓ ALU tests completed." << Colors::RESET << std::endl;
 }
 
-void REG_TESTS(){
+void REG_TESTS(Helper &run){
+  std::cout << Colors::CYAN << Colors::BOLD << "\n==== REGISTER TESTS ====" << Colors::RESET << std::endl;
   Register reg;
   reg.reg_create(CPUConfig::RegCount, CPUConfig::UseZeroReg, CPUConfig::RegReadDelay, CPUConfig::RegWriteDelay);
   std::cout << std::endl;
 
-  run_reg_write_test(reg, 1, 100, "reg_write(r1, 100)");
-  run_reg_write_test(reg, 2, 200, "reg_write(r2, 200)");
-  run_reg_write_test(reg, 0, 255, "reg_write(r0, 255)");
+  std::cout << Colors::YELLOW << "--- Write Operations ---" << Colors::RESET << std::endl;
+  run.reg_write_test(reg, 1, 100, "Write 100 to r1");
+  run.reg_write_test(reg, 2, 200, "Write 200 to r2");
+  run.reg_write_test(reg, 0, 255, "Attempt write 255 to r0 (should be ignored)");
+  std::cout << std::endl;
   reg.print_all_regs();
-  
-  run_reg_read_test(reg, 1, 2, "reg_read(r1, r2)");
-  run_reg_read_test(reg, 0, 0, "reg_read(r0, r0)");
-  run_reg_read_test(reg, 0, 1, "reg_read(r0, r1)");
+
+  std::cout << std::endl << Colors::YELLOW << "--- Read Operations ---" << Colors::RESET << std::endl;
+  run.reg_read_test(reg, 1, 2, "Read from r1 and r2");
+  run.reg_read_test(reg, 0, 0, "Read from r0 twice");
+  run.reg_read_test(reg, 0, 1, "Read from r0 and r1");
+
+  std::cout << std::endl << Colors::YELLOW << "--- Clear Operation ---" << Colors::RESET << std::endl;
   reg.reg_clear();
   reg.print_all_regs();
-  
-  std::cout << "Register tests completed." << std::endl;
+
+  std::cout << std::endl << Colors::GREEN << Colors::BOLD << "✓ Register tests completed." << Colors::RESET << std::endl;
 }
 
-void COMBINED_TESTS() {
+void COMBINED_TESTS(Helper &run) {
+  std::cout << Colors::CYAN << Colors::BOLD << "\n==== COMBINED ALU + REGISTER TESTS ====" << Colors::RESET << std::endl;
   ALU alu;
   Register reg;
-  
   alu.alu_setup(CPUConfig::ALUDelay);
   reg.reg_create(CPUConfig::RegCount, CPUConfig::UseZeroReg, CPUConfig::RegReadDelay, CPUConfig::RegWriteDelay);
   std::cout << std::endl;
 
+  std::cout << Colors::YELLOW << "--- Setup: Initialize registers ---" << Colors::RESET << std::endl;
   // テスト用の初期値をレジスタに設定
+  std::cout << Colors::DIM << "Setting up test values..." << Colors::RESET << std::endl;
   reg.reg_write(1, 150);  // r1 = 150
   reg.reg_write(2, 100);  // r2 = 100
   reg.reg_write(3, 50);   // r3 = 50
   reg.reg_write(4, 255);  // r4 = 255
-  std::cout << "\nInitial register state:" << std::endl;
+
+  std::cout << std::endl << Colors::BOLD << "Initial register state:" << Colors::RESET << std::endl;
   reg.print_all_regs();
 
+  std::cout << std::endl << Colors::YELLOW << "--- ALU + Register Operations ---" << Colors::RESET << std::endl;
   // 組み合わせテストの実行
-  run_combined_test(alu, reg, 1, 2, 5, Opcode::ADD, "ADD r1+r2 -> r5 (150+100)");
-  run_combined_test(alu, reg, 1, 3, 6, Opcode::SUB, "SUB r1-r3 -> r6 (150-50)");
-  run_combined_test(alu, reg, 2, 4, 7, Opcode::AND, "AND r2&r4 -> r7 (100&255)");
-  run_combined_test(alu, reg, 5, 6, 1, Opcode::XOR, "XOR r5^r6 -> r1 (result^result)");
+  run.combined_test(alu, reg, 1, 2, 5, Opcode::ADD, "ADD r1+r2 -> r5 (150+100)");
+  std::cout << std::endl;
+  run.combined_test(alu, reg, 1, 3, 6, Opcode::SUB, "SUB r1-r3 -> r6 (150-50)");
+  std::cout << std::endl;
+  run.combined_test(alu, reg, 2, 4, 7, Opcode::AND, "AND r2&r4 -> r7 (100&255)");
+  std::cout << std::endl;
+  run.combined_test(alu, reg, 5, 6, 1, Opcode::XOR, "XOR r5^r6 -> r1 (result^result)");
 
-  std::cout << "\nFinal register state:" << std::endl;
+  std::cout << std::endl << Colors::BOLD << "Final register state:" << Colors::RESET << std::endl;
   reg.print_all_regs();
-  
-  std::cout << "Combined ALU+Register tests completed." << std::endl;
+
+  std::cout << std::endl << Colors::GREEN << Colors::BOLD << "✓ Combined ALU+Register tests completed." << Colors::RESET << std::endl;
 }
 
 // テスト
 int main() {
-  ALU_TESTS();
-  std::cout << std::endl;
-  Halt(1.0);
-    
-  REG_TESTS();
-  std::cout << std::endl;
-  Halt(1.0);
+  Helper run;
   
-  COMBINED_TESTS();
+  std::cout << Colors::BOLD << Colors::CYAN << "\nCPU Component Test Suite" << Colors::RESET << std::endl;
+  std::cout << Colors::DIM << "Testing ALU and Register implementations..." << Colors::RESET << std::endl;
+  std::cout << std::string(50, '=') << std::endl;
+
+  ALU_TESTS(run);
   std::cout << std::endl;
-  Halt(1.0);
+  run.halt(1.0);
+
+  REG_TESTS(run);
+  std::cout << std::endl;
+  run.Halt(1.0);
+
+  COMBINED_TESTS(run);
+  std::cout << std::endl;
+  run.halt(1.0);
   
-  std::cout << "All tests completed." << std::endl;
-  
+  std::cout << std::string(50, '=') << std::endl;
+  std::cout << Colors::GREEN << Colors::BOLD << "All tests completed successfully!" << Colors::RESET << std::endl;
+  std::cout << Colors::DIM << "CPU components are working correctly." << Colors::RESET << std::endl;
+
   return 0;
 }
